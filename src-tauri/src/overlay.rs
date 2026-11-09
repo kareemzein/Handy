@@ -88,7 +88,7 @@ static LAST_MIC_LEVEL_EMIT: AtomicU64 = AtomicU64::new(0);
 const EMIT_THROTTLE_MS: u64 = 33; // ~30 FPS
 
 #[cfg(target_os = "macos")]
-const OVERLAY_TOP_OFFSET: f64 = 46.0;
+const OVERLAY_TOP_OFFSET: f64 = 0.0;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 const OVERLAY_TOP_OFFSET: f64 = 4.0;
 

@@ -72,6 +72,13 @@
   /* column-reverse stacks the control pill above the text region. */
   flex-direction: column-reverse;
   transform-origin: top center;
+  background: #000000 !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 18px !important;
+  border-bottom-right-radius: 18px !important;
+  border-top: none !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 .ov-stage.top .stext-cap {
   /* Mirror of the bottom overlay (top: 12 / bottom: 0): the first line sits flush

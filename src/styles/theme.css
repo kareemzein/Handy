@@ -11,12 +11,12 @@
      in App.css reference these, so a hex value lives in exactly one place. */
   --light-color-text: #0f0f0f;
   --light-color-background: #fbfbfb;
-  --light-color-logo-primary: #faa2ca;
-  --light-color-logo-stroke: #382731;
+  --light-color-logo-primary: #1d4ed8;
+  --light-color-logo-stroke: #1e3a8a;
 
   --dark-color-text: #fbfbfb;
-  --dark-color-background: #2c2b29;
-  --dark-color-logo-primary: #f28cbb;
+  --dark-color-background: #18181b;
+  --dark-color-logo-primary: #3b82f6;
 
   /* Status colors. Each has a -wash tint below. */
   --light-color-warning: #d97706;
