@@ -13,10 +13,12 @@
   --light-color-background: #fbfbfb;
   --light-color-logo-primary: #1d4ed8;
   --light-color-logo-stroke: #1e3a8a;
+  --light-color-background-ui: #2563eb;
 
   --dark-color-text: #fbfbfb;
   --dark-color-background: #18181b;
   --dark-color-logo-primary: #3b82f6;
+  --dark-color-background-ui: #3b82f6;
 
   /* Status colors. Each has a -wash tint below. */
   --light-color-warning: #d97706;
@@ -55,22 +57,22 @@
     ),
     radial-gradient(
       90% 80% at 5% -5%,
-      color-mix(in srgb, #c7b9ef 55%, #fbfbfb) 0%,
+      color-mix(in srgb, #93c5fd 55%, #fbfbfb) 0%,
       transparent 62%
     ),
-    color-mix(in srgb, #e9e1f3 60%, #fbfbfb);
+    color-mix(in srgb, #dbeafe 60%, #fbfbfb);
   --dark-demo-wallpaper:
     radial-gradient(
       110% 80% at 90% 105%,
-      color-mix(in srgb, var(--dark-color-logo-primary) 26%, #1b1719) 0%,
+      color-mix(in srgb, var(--dark-color-logo-primary) 26%, #18181b) 0%,
       transparent 60%
     ),
     radial-gradient(
       90% 80% at 5% -5%,
-      color-mix(in srgb, #7c68c0 38%, #1b1719) 0%,
+      color-mix(in srgb, #1e3a8a 38%, #18181b) 0%,
       transparent 62%
     ),
-    #1f1a1e;
+    #18181b;
 
   /* The wordmark. Dark mode outlines it in white to cut down on pinks. */
   --light-color-wordmark: var(--light-color-logo-primary);
@@ -124,13 +126,13 @@
   );
 
   /* Tokens that do not change between light and dark */
-  --color-background-ui: #da5893;
   --color-mid-gray: #808080;
 
   /* Active palette — defaults to light, follows the OS via the media query
      below, or is forced by `data-theme` (see the overrides below). */
   --color-text: var(--light-color-text);
   --color-background: var(--light-color-background);
+  --color-background-ui: var(--light-color-background-ui);
   --color-logo-primary: var(--light-color-logo-primary);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
@@ -169,6 +171,7 @@
   :root {
     --color-text: var(--dark-color-text);
     --color-background: var(--dark-color-background);
+    --color-background-ui: var(--dark-color-background-ui);
     --color-logo-primary: var(--dark-color-logo-primary);
     --color-warning: var(--dark-color-warning);
     --color-error: var(--dark-color-error);
@@ -202,6 +205,7 @@
 :root[data-theme="light"] {
   --color-text: var(--light-color-text);
   --color-background: var(--light-color-background);
+  --color-background-ui: var(--light-color-background-ui);
   --color-logo-primary: var(--light-color-logo-primary);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
@@ -224,6 +228,7 @@
 :root[data-theme="dark"] {
   --color-text: var(--dark-color-text);
   --color-background: var(--dark-color-background);
+  --color-background-ui: var(--dark-color-background-ui);
   --color-logo-primary: var(--dark-color-logo-primary);
   --color-warning: var(--dark-color-warning);
   --color-error: var(--dark-color-error);
