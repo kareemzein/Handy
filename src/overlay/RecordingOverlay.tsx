@@ -22,7 +22,8 @@ type OverlayState =
   | "transcribing"
   | "processing"
   | "notice"
-  | "live_notice";
+  | "live_notice"
+  | "copied_notice";
 
 const isNoticeState = (state: OverlayState) =>
   state === "notice" || state === "live_notice";
@@ -435,6 +436,45 @@ const RecordingOverlay: React.FC = () => {
   const working = state === "transcribing" || state === "processing";
   const workLabel =
     state === "processing" ? t("overlay.processing") : transcribingLabel;
+
+  // Copied to clipboard notification (HeyClicky style):
+  if (state === "copied_notice") {
+    return (
+      <div
+        dir={direction}
+        className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+      >
+        <div
+          className="copied-card"
+          onClick={() => commands.dismissOverlayNotice()}
+        >
+          <div className="copied-title">Copied to your clipboard</div>
+          <div className="copied-subtitle">Press ⌘V to paste</div>
+          <button
+            className="copied-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              commands.dismissOverlayNotice();
+            }}
+            aria-label="Dismiss"
+          >
+            <svg className="copied-timer-ring" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" className="timer-track" />
+              <circle cx="12" cy="12" r="9" className="timer-progress" />
+            </svg>
+            <svg className="copied-close-x" viewBox="0 0 16 16">
+              <path
+                d="M4.5 4.5 L11.5 11.5 M11.5 4.5 L4.5 11.5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Notch mode for top placement on macOS:
   if (position === "top" && !shownNotice) {

@@ -54,6 +54,9 @@ const OVERLAY_HEIGHT: f64 = 50.0;
 const OVERLAY_NOTCH_WIDTH: f64 = 470.0;
 const OVERLAY_NOTCH_HEIGHT: f64 = 36.0;
 
+const OVERLAY_COPIED_WIDTH: f64 = 360.0;
+const OVERLAY_COPIED_HEIGHT: f64 = 76.0;
+
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
@@ -78,9 +81,15 @@ fn notice_state(session_is_live: bool) -> &'static str {
     }
 }
 
+fn is_copied_state(state: &str) -> bool {
+    state == "copied_notice"
+}
+
 /// Overlay window size (logical) for a given UI state and position.
 fn overlay_dimensions_for(position: OverlayPosition, state: &str) -> (f64, f64) {
-    if is_live_state(state) {
+    if is_copied_state(state) {
+        (OVERLAY_COPIED_WIDTH, OVERLAY_COPIED_HEIGHT)
+    } else if is_live_state(state) {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
     } else if position == OverlayPosition::Top {
         #[cfg(target_os = "macos")]
@@ -708,6 +717,26 @@ pub fn dismiss_overlay_notice(app_handle: &AppHandle) {
     if OVERLAY_NOTICE_GENERATION.load(Ordering::SeqCst) == shown {
         hide_recording_overlay(app_handle);
     }
+}
+
+/// Shows the "Copied to clipboard" notification overlay and auto-fades it after 3.8s.
+pub fn show_copied_to_clipboard_overlay(app_handle: &AppHandle) {
+    if !OVERLAY_ENABLED.load(Ordering::Relaxed) {
+        return;
+    }
+    OVERLAY_SESSION_SHOWING.store(false, Ordering::SeqCst);
+    let handle = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        show_overlay_state_on_main(&handle, "copied_notice");
+        let generation = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
+        OVERLAY_NOTICE_GENERATION.store(generation, Ordering::SeqCst);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(3800));
+            if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == generation {
+                hide_recording_overlay(&handle);
+            }
+        });
+    });
 }
 
 pub fn is_session_showing() -> bool {

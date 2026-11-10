@@ -877,6 +877,23 @@ impl ShortcutAction for TranscribeAction {
                                         // UI while this paste ran.
                                         let owns_ui =
                                             || RECORDING_SESSION.load(Ordering::SeqCst) == session;
+
+                                        #[cfg(target_os = "macos")]
+                                        let has_target = crate::accessibility_check::has_focused_text_element();
+                                        #[cfg(not(target_os = "macos"))]
+                                        let has_target = true;
+
+                                        if !has_target {
+                                            info!("No focused text element detected; copying to clipboard");
+                                            use tauri_plugin_clipboard_manager::ClipboardExt;
+                                            let _ = ah_clone.clipboard().write_text(&final_text);
+                                            if owns_ui() {
+                                                overlay::show_copied_to_clipboard_overlay(&ah_clone);
+                                                notices::clear(&ah_clone, NoticeSource::Dictation);
+                                            }
+                                            set_tray_state(&ah_clone, TrayIconState::Idle);
+                                            return;
+                                        }
                                         let (outcome, notice) =
                                             match utils::paste(final_text, ah_clone.clone()) {
                                                 Ok(()) => {
