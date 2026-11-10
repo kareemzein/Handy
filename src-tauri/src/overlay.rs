@@ -51,6 +51,9 @@ tauri_panel! {
 const OVERLAY_WIDTH: f64 = 266.0;
 const OVERLAY_HEIGHT: f64 = 50.0;
 
+const OVERLAY_NOTCH_WIDTH: f64 = 470.0;
+const OVERLAY_NOTCH_HEIGHT: f64 = 36.0;
+
 // Actual is 394x118, just a little extra
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
@@ -75,13 +78,28 @@ fn notice_state(session_is_live: bool) -> &'static str {
     }
 }
 
-/// Overlay window size (logical) for a given UI state.
-fn overlay_dimensions(state: &str) -> (f64, f64) {
+/// Overlay window size (logical) for a given UI state and position.
+fn overlay_dimensions_for(position: OverlayPosition, state: &str) -> (f64, f64) {
     if is_live_state(state) {
         (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
+    } else if position == OverlayPosition::Top {
+        #[cfg(target_os = "macos")]
+        {
+            (OVERLAY_NOTCH_WIDTH, OVERLAY_NOTCH_HEIGHT)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            (OVERLAY_WIDTH, OVERLAY_HEIGHT)
+        }
     } else {
         (OVERLAY_WIDTH, OVERLAY_HEIGHT)
     }
+}
+
+/// Overlay window size (logical) for a given UI state.
+fn overlay_dimensions(app_handle: &AppHandle, state: &str) -> (f64, f64) {
+    let settings = settings::get_settings(app_handle);
+    overlay_dimensions_for(settings.overlay_position, state)
 }
 
 static LAST_MIC_LEVEL_EMIT: AtomicU64 = AtomicU64::new(0);
@@ -472,7 +490,8 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
 /// Creates the recording overlay panel and keeps it hidden by default (macOS)
 #[cfg(target_os = "macos")]
 pub fn create_recording_overlay(app_handle: &AppHandle) {
-    if let Some((x, y)) = calculate_overlay_position(app_handle, OVERLAY_WIDTH, OVERLAY_HEIGHT) {
+    let (init_width, init_height) = overlay_dimensions(app_handle, "recording");
+    if let Some((x, y)) = calculate_overlay_position(app_handle, init_width, init_height) {
         // PanelBuilder creates a Tauri window then converts it to NSPanel.
         // The window remains registered, so get_webview_window() still works.
         match PanelBuilder::<_, RecordingOverlayPanel>::new(app_handle, "recording_overlay")
@@ -481,8 +500,8 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
             .position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
             .level(PanelLevel::Status)
             .size(tauri::Size::Logical(tauri::LogicalSize {
-                width: OVERLAY_WIDTH,
-                height: OVERLAY_HEIGHT,
+                width: init_width,
+                height: init_height,
             }))
             .has_shadow(false)
             .transparent(true)
@@ -533,7 +552,7 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 
 fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
     // Size the overlay for this state (compact vs. streaming), then position it.
-    let (width, height) = overlay_dimensions(state);
+    let (width, height) = overlay_dimensions(app_handle, state);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Invalidate any delayed hide still in flight from a previous session
         // (see `hide_recording_overlay`).
@@ -722,7 +741,7 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
             } else {
                 "recording"
             };
-            let (width, height) = overlay_dimensions(state);
+            let (width, height) = overlay_dimensions(app_handle, state);
             if let Err(error) = place_windows_overlay(app_handle, &overlay_window, width, height) {
                 log::error!("Failed to update recording overlay position: {error}");
             }
@@ -852,8 +871,8 @@ mod tests {
     fn a_notice_keeps_the_size_of_its_session() {
         for (session, live) in [("streaming", true), ("recording", false)] {
             assert_eq!(
-                overlay_dimensions(notice_state(is_live_state(session))),
-                overlay_dimensions(session)
+                overlay_dimensions_for(OverlayPosition::Bottom, notice_state(is_live_state(session))),
+                overlay_dimensions_for(OverlayPosition::Bottom, session)
             );
             assert_eq!(is_live_state(session), live);
         }

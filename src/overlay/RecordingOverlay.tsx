@@ -436,6 +436,58 @@ const RecordingOverlay: React.FC = () => {
   const workLabel =
     state === "processing" ? t("overlay.processing") : transcribingLabel;
 
+  // Notch mode for top placement on macOS:
+  if (position === "top" && !shownNotice) {
+    return (
+      <div
+        dir={direction}
+        className={`ov-stage top ov-fade ${isVisible ? "show" : ""}`}
+      >
+        <div
+          className="scard compact notch-card"
+          onClick={() => commands.cancelOperation()}
+        >
+          <div className="notch-row">
+            <div className="notch-left">
+              {working ? (
+                <span className="sspinner notch-spinner" />
+              ) : (
+                <span className={`sdot ${captureReady ? "ready" : "arming"}`} />
+              )}
+              <span className="notch-label">
+                {working ? "Transcribing" : "Dictating"}
+              </span>
+            </div>
+            <div className="notch-spacer" />
+            <div className="notch-right">
+              {working ? (
+                <div className="swave notch-wave idle">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              ) : (
+                <div
+                  className={`swave notch-wave ${captureReady ? "ready" : "arming"}`}
+                >
+                  {levels.slice(0, 4).map((v, i) => (
+                    <i
+                      key={i}
+                      style={{
+                        height: `${Math.max(3, Math.min(14, 3 + Math.pow(v, 0.7) * 11))}px`,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       dir={direction}
