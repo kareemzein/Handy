@@ -15,6 +15,7 @@ pub mod macos_focus {
     #[link(name = "CoreFoundation", kind = "framework")]
     extern "C" {
         fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+        fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
         fn AXUIElementCopyAttributeValue(
             element: AXUIElementRef,
             attribute: *const c_void,
@@ -25,100 +26,167 @@ pub mod macos_focus {
 
     pub fn has_focused_text_element() -> bool {
         unsafe {
-            let system_wide = AXUIElementCreateSystemWide();
-            if system_wide.is_null() {
-                return false;
-            }
+            let ws_class = match AnyClass::get(c"NSWorkspace") {
+                Some(cls) => cls,
+                None => return true,
+            };
 
-            let attr_focused = NSString::from_str("AXFocusedUIElement");
-            let mut focused_val: *const c_void = std::ptr::null();
-            let err = AXUIElementCopyAttributeValue(
-                system_wide,
-                &*attr_focused as *const NSString as *const c_void,
-                &mut focused_val,
-            );
-            CFRelease(system_wide as *const c_void);
-
-            if err != K_AX_ERROR_SUCCESS || focused_val.is_null() {
-                return false;
-            }
-
-            let focused_elem = focused_val as AXUIElementRef;
-
-            // 1. Check if the element has an active text selection / insertion point range
-            // AXSelectedTextRange is the universal attribute supported by all editable text fields
-            let attr_range = NSString::from_str("AXSelectedTextRange");
-            let mut range_val: *const c_void = std::ptr::null();
-            let range_err = AXUIElementCopyAttributeValue(
-                focused_elem,
-                &*attr_range as *const NSString as *const c_void,
-                &mut range_val,
-            );
-            if !range_val.is_null() {
-                CFRelease(range_val);
-            }
-            if range_err == K_AX_ERROR_SUCCESS {
-                CFRelease(focused_val);
+            let ws: *mut AnyObject = msg_send![ws_class, sharedWorkspace];
+            if ws.is_null() {
                 return true;
             }
 
-            // 2. Check role (AXTextField, AXTextArea, AXComboBox, AXSearchField)
-            let attr_role = NSString::from_str("AXRole");
-            let mut role_val: *const c_void = std::ptr::null();
-            let role_err = AXUIElementCopyAttributeValue(
-                focused_elem,
-                &*attr_role as *const NSString as *const c_void,
-                &mut role_val,
-            );
+            let front_app: *mut AnyObject = msg_send![ws, frontmostApplication];
+            if front_app.is_null() {
+                // No frontmost app -> desktop/empty -> copy to clipboard
+                return false;
+            }
 
-            let mut is_text_role = false;
-            if role_err == K_AX_ERROR_SUCCESS && !role_val.is_null() {
-                let role_ns = &*(role_val as *const NSString);
-                let role_str = role_ns.to_string();
-                if role_str == "AXTextField"
-                    || role_str == "AXTextArea"
-                    || role_str == "AXComboBox"
-                    || role_str == "AXSearchField"
-                {
-                    is_text_role = true;
+            let bundle_id_ns: *mut NSString = msg_send![front_app, bundleIdentifier];
+            let pid: i32 = msg_send![front_app, processIdentifier];
+
+            let bundle_id = if !bundle_id_ns.is_null() {
+                (&*bundle_id_ns).to_string().to_lowercase()
+            } else {
+                String::new()
+            };
+
+            // 1. Text-centric apps, AI assistants, IDEs, and Terminals:
+            // These apps are explicitly designed for text input and editing.
+            // Accessibility APIs often return disabled/internal states in Electron/Chromium,
+            // but keystroke injection (Cmd+V) always works.
+            if bundle_id.contains("antigravity")
+                || bundle_id.contains("claude")
+                || bundle_id.contains("vscode")
+                || bundle_id.contains("cursor")
+                || bundle_id.contains("terminal")
+                || bundle_id.contains("iterm")
+                || bundle_id.contains("warp")
+                || bundle_id.contains("ghostty")
+                || bundle_id.contains("kitty")
+                || bundle_id.contains("alacritty")
+                || bundle_id.contains("sublime")
+                || bundle_id.contains("jetbrains")
+                || bundle_id.contains("zed")
+            {
+                return true;
+            }
+
+            // 2. System Shell & Desktop:
+            // When user clicks the desktop wallpaper or dock, Finder / Dock is frontmost.
+            let is_system_shell = bundle_id == "com.apple.finder"
+                || bundle_id == "com.apple.dock"
+                || bundle_id == "com.apple.windowmanager"
+                || bundle_id == "com.apple.systemuiserver"
+                || bundle_id == "com.apple.notificationcenterui";
+
+            // Helper to inspect focused element attributes
+            let inspect_element = |elem: AXUIElementRef| -> Option<bool> {
+                // Check AXSelectedTextRange: universal indicator of text cursor / selection
+                let attr_range = NSString::from_str("AXSelectedTextRange");
+                let mut range_val: *const c_void = std::ptr::null();
+                let range_err = AXUIElementCopyAttributeValue(
+                    elem,
+                    &*attr_range as *const NSString as *const c_void,
+                    &mut range_val,
+                );
+                if !range_val.is_null() {
+                    CFRelease(range_val);
                 }
-                CFRelease(role_val);
+                if range_err == K_AX_ERROR_SUCCESS {
+                    return Some(true);
+                }
+
+                // Check AXRole
+                let attr_role = NSString::from_str("AXRole");
+                let mut role_val: *const c_void = std::ptr::null();
+                let role_err = AXUIElementCopyAttributeValue(
+                    elem,
+                    &*attr_role as *const NSString as *const c_void,
+                    &mut role_val,
+                );
+                if role_err == K_AX_ERROR_SUCCESS && !role_val.is_null() {
+                    let role_str = (&*(role_val as *const NSString)).to_string();
+                    CFRelease(role_val);
+
+                    if role_str == "AXTextField"
+                        || role_str == "AXTextArea"
+                        || role_str == "AXComboBox"
+                        || role_str == "AXSearchField"
+                    {
+                        return Some(true);
+                    }
+
+                    // Blank webpage background in browser or non-text UI control
+                    if role_str == "AXWebArea"
+                        || role_str == "AXScrollArea"
+                        || role_str == "AXButton"
+                        || role_str == "AXCheckBox"
+                        || role_str == "AXRadioButton"
+                        || role_str == "AXSlider"
+                        || role_str == "AXScrollBar"
+                        || role_str == "AXTabGroup"
+                    {
+                        return Some(false);
+                    }
+                }
+
+                None
+            };
+
+            // Query application-specific AXUIElement
+            let app_elem = if pid > 0 {
+                AXUIElementCreateApplication(pid)
+            } else {
+                std::ptr::null()
+            };
+
+            let mut focused_val: *const c_void = std::ptr::null();
+            let attr_focused = NSString::from_str("AXFocusedUIElement");
+
+            let mut query_success = false;
+            if !app_elem.is_null() {
+                let err = AXUIElementCopyAttributeValue(
+                    app_elem,
+                    &*attr_focused as *const NSString as *const c_void,
+                    &mut focused_val,
+                );
+                CFRelease(app_elem as *const c_void);
+                if err == K_AX_ERROR_SUCCESS && !focused_val.is_null() {
+                    query_success = true;
+                }
             }
 
-            CFRelease(focused_val);
-
-            if is_text_role {
-                return true;
-            }
-
-            // 3. Terminal apps (which accept direct text input even without AXSelectedTextRange)
-            if let Some(ws_class) = AnyClass::get(c"NSWorkspace") {
-                let ws: *mut AnyObject = msg_send![ws_class, sharedWorkspace];
-                if !ws.is_null() {
-                    let front_app: *mut AnyObject = msg_send![ws, frontmostApplication];
-                    if !front_app.is_null() {
-                        let bundle_id: *mut NSString = msg_send![front_app, bundleIdentifier];
-                        if !bundle_id.is_null() {
-                            let b = (&*bundle_id).to_string();
-                            let terminals = [
-                                "com.apple.Terminal",
-                                "com.googlecode.iterm2",
-                                "dev.warp.Warp-Stable",
-                                "com.mitchellh.ghostty",
-                                "net.kovidgoyal.kitty",
-                                "com.alacritty",
-                            ];
-                            for t in &terminals {
-                                if b.eq_ignore_ascii_case(t) {
-                                    return true;
-                                }
-                            }
-                        }
+            if !query_success {
+                let system_wide = AXUIElementCreateSystemWide();
+                if !system_wide.is_null() {
+                    let err = AXUIElementCopyAttributeValue(
+                        system_wide,
+                        &*attr_focused as *const NSString as *const c_void,
+                        &mut focused_val,
+                    );
+                    CFRelease(system_wide as *const c_void);
+                    if err == K_AX_ERROR_SUCCESS && !focused_val.is_null() {
+                        query_success = true;
                     }
                 }
             }
 
-            false
+            if query_success && !focused_val.is_null() {
+                let result = inspect_element(focused_val as AXUIElementRef);
+                CFRelease(focused_val);
+                if let Some(is_text) = result {
+                    return is_text;
+                }
+            }
+
+            // If we are in the system shell (Desktop, Dock) with no text field -> clipboard
+            if is_system_shell {
+                return false;
+            }
+
+            // Fail-open for general apps so typing is never broken
+            true
         }
     }
 }
