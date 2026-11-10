@@ -585,6 +585,10 @@
 /* ============================================================
    Copied to Clipboard Notification Card (HeyClicky style)
    ============================================================ */
+.copied-stage {
+  pointer-events: auto;
+}
+
 .copied-card {
   width: 330px;
   height: 64px;
@@ -602,13 +606,62 @@
   position: relative;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
   cursor: pointer;
-  animation: scard-pop 360ms cubic-bezier(0.22, 1, 0.36, 1);
   padding: 10px 18px;
+  will-change: transform, opacity;
 }
 
+/* TOP PLACEMENT (tucks into notch) */
+.ov-stage.top .copied-card {
+  transform-origin: top center;
+  animation: copied-pop-top 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ov-stage.top .copied-card.leaving {
+  animation: none !important;
+  transform: translateY(-100%) scale(0.55);
+  opacity: 0;
+  transition:
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 240ms ease-in;
+}
+
+@keyframes copied-pop-top {
+  0% {
+    transform: translateY(-100%) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* BOTTOM PLACEMENT (tucks into bottom edge) */
 .ov-stage.bottom .copied-card {
   border-radius: 18px !important;
   margin-bottom: 20px;
+  transform-origin: bottom center;
+  animation: copied-pop-bottom 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ov-stage.bottom .copied-card.leaving {
+  animation: none !important;
+  transform: translateY(100%) scale(0.55);
+  opacity: 0;
+  transition:
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 240ms ease-in;
+}
+
+@keyframes copied-pop-bottom {
+  0% {
+    transform: translateY(100%) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 .copied-title {

@@ -731,7 +731,7 @@ pub fn show_copied_to_clipboard_overlay(app_handle: &AppHandle) {
         let generation = OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst);
         OVERLAY_NOTICE_GENERATION.store(generation, Ordering::SeqCst);
         std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(3800));
+            std::thread::sleep(Duration::from_millis(3500));
             if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) == generation {
                 hide_recording_overlay(&handle);
             }
@@ -825,7 +825,7 @@ pub fn hide_recording_overlay(app_handle: &AppHandle) {
         // unless a newer session has shown the overlay again by then.
         let window_clone = overlay_window.clone();
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(300));
+            std::thread::sleep(std::time::Duration::from_millis(350));
             if OVERLAY_SHOW_GENERATION.load(Ordering::SeqCst) != scheduled_at {
                 log::debug!("Skipping stale overlay hide: a newer session is showing the overlay");
                 return;

@@ -128,7 +128,7 @@ const RecordingOverlay: React.FC = () => {
           // Keep the previous/default placement if settings can't be read.
         }
         setState(overlayState);
-        if (overlayState === "streaming") {
+        if (overlayState === "streaming" || overlayState === "copied_notice") {
           setPhase("listening");
           setWorkKind("transcribing");
           setElapsed(0);
@@ -442,11 +442,15 @@ const RecordingOverlay: React.FC = () => {
     return (
       <div
         dir={direction}
-        className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+        className={`ov-stage ${position} copied-stage`}
       >
         <div
-          className="copied-card"
-          onClick={() => commands.dismissOverlayNotice()}
+          key={session}
+          className={`copied-card ${isVisible ? "" : "leaving"}`}
+          onClick={() => {
+            setIsVisible(false);
+            commands.dismissOverlayNotice();
+          }}
         >
           <div className="copied-title">Copied to your clipboard</div>
           <div className="copied-subtitle">Press ⌘V to paste</div>
@@ -454,6 +458,7 @@ const RecordingOverlay: React.FC = () => {
             className="copied-close-btn"
             onClick={(e) => {
               e.stopPropagation();
+              setIsVisible(false);
               commands.dismissOverlayNotice();
             }}
             aria-label="Dismiss"
