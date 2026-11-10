@@ -93,53 +93,6 @@ export const usePermissions = (preview: boolean): Permissions => {
     await Promise.all([refreshAudioDevices(), refreshOutputDevices()]);
   }, [refreshAudioDevices, refreshOutputDevices]);
 
-  // The first check: decides whether the Permissions screen is part of the flow.
-  useEffect(() => {
-    if (preview) {
-      setAccessibility(isMacOS ? "needed" : "granted");
-      setMicrophone(os === "other" ? "granted" : "needed");
-      setNeeded(os !== "other");
-      return;
-    }
-    if (os === "other") {
-      setAccessibility("granted");
-      setMicrophone("granted");
-      return;
-    }
-    const check = async () => {
-      if (isMacOS) {
-        try {
-          const [acc, mic] = await readMac();
-          if (acc) await initializeAfterAccessibility();
-          setAccessibility(acc ? "granted" : "needed");
-          setMicrophone(mic ? "granted" : "needed");
-          setNeeded(!(acc && mic));
-          if (acc && mic) await onAllGranted();
-        } catch (error) {
-          console.error("Failed to check macOS permissions:", error);
-          notify({ title: t("onboarding.permissions.errors.checkFailed") });
-          setAccessibility("needed");
-          setMicrophone("needed");
-          setNeeded(true);
-        }
-        return;
-      }
-      setAccessibility("granted");
-      try {
-        const mic = await hasWindowsMicrophoneAccess();
-        setMicrophone(mic ? "granted" : "needed");
-        setNeeded(!mic);
-        if (mic) await onAllGranted();
-      } catch (error) {
-        console.warn("Failed to check Windows microphone permissions:", error);
-        setMicrophone("granted");
-        await onAllGranted();
-      }
-    };
-    check();
-    // The first check runs once.
-  }, []);
-
   const startPolling = useCallback(() => {
     if (pollingRef.current) return;
     pollingRef.current = setInterval(async () => {
@@ -174,6 +127,62 @@ export const usePermissions = (preview: boolean): Permissions => {
       }
     }, 1000);
   }, [hasWindowsMicrophoneAccess, isWindows, onAllGranted, t]);
+
+  // The first check: decides whether the Permissions screen is part of the flow.
+  useEffect(() => {
+    if (preview) {
+      setAccessibility(isMacOS ? "needed" : "granted");
+      setMicrophone(os === "other" ? "granted" : "needed");
+      setNeeded(os !== "other");
+      return;
+    }
+    if (os === "other") {
+      setAccessibility("granted");
+      setMicrophone("granted");
+      return;
+    }
+    const check = async () => {
+      if (isMacOS) {
+        try {
+          const [acc, mic] = await readMac();
+          if (acc) await initializeAfterAccessibility();
+          setAccessibility(acc ? "granted" : "needed");
+          setMicrophone(mic ? "granted" : "needed");
+          setNeeded(!(acc && mic));
+          if (acc && mic) {
+            await onAllGranted();
+          } else {
+            startPolling();
+          }
+        } catch (error) {
+          console.error("Failed to check macOS permissions:", error);
+          notify({ title: t("onboarding.permissions.errors.checkFailed") });
+          setAccessibility("needed");
+          setMicrophone("needed");
+          setNeeded(true);
+          startPolling();
+        }
+        return;
+      }
+      setAccessibility("granted");
+      try {
+        const mic = await hasWindowsMicrophoneAccess();
+        setMicrophone(mic ? "granted" : "needed");
+        setNeeded(!mic);
+        if (mic) {
+          await onAllGranted();
+        } else {
+          startPolling();
+        }
+      } catch (error) {
+        console.warn("Failed to check Windows microphone permissions:", error);
+        setMicrophone("granted");
+        await onAllGranted();
+      }
+    };
+    check();
+    // The first check runs once.
+  }, [hasWindowsMicrophoneAccess, isMacOS, os, preview, startPolling, t, onAllGranted]);
 
   useEffect(() => stopPolling, []);
 

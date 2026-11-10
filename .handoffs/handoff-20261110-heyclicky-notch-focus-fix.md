@@ -68,14 +68,17 @@ cd "/Users/kareemzein/Documents/Claude Personal/Handy"
 bun run build
 
 # 3. Compile the release binary using the local Rust toolchain:
+# IMPORTANT: `--features tauri/custom-protocol` is required so Tauri embeds `dist/`
+# into the binary instead of pointing webviews at localhost:1420!
 source "$HOME/.cargo/env"
 cd src-tauri
-cargo build --release --target aarch64-apple-darwin
+cargo build --release --target aarch64-apple-darwin --features tauri/custom-protocol
 
-# 4. Install and re-sign:
+# 4. Install and re-sign with entitlements:
+# IMPORTANT: `--entitlements Entitlements.plist` is required so macOS grants microphone access!
 pkill -f "/Applications/Handy.app/Contents/MacOS/handy" || true
 cp target/aarch64-apple-darwin/release/handy /Applications/Handy.app/Contents/MacOS/handy
-codesign --force --deep --sign - /Applications/Handy.app
+codesign --force --deep --sign - --entitlements Entitlements.plist /Applications/Handy.app
 open /Applications/Handy.app
 ```
 

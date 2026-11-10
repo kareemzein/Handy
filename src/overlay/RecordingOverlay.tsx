@@ -95,6 +95,17 @@ const RecordingOverlay: React.FC = () => {
 
   useEffect(() => {
     const setupEventListeners = async () => {
+      try {
+        const settings = await commands.getAppSettings();
+        if (settings.status === "ok") {
+          setPosition(
+            settings.data.overlay_position === "top" ? "top" : "bottom",
+          );
+        }
+      } catch {
+        // Keep the previous/default placement if settings can't be read.
+      }
+
       const unlistenNotice = await listen<Notice>("overlay-notice", (event) => {
         clearTimeout(fadeTimerRef.current);
         setNotice(event.payload);
@@ -113,6 +124,15 @@ const RecordingOverlay: React.FC = () => {
           setLevels(Array(WAVE_BARS).fill(0));
           setStreamText({ committed: "", tentative: "" });
         }
+        setState(overlayState);
+        if (overlayState === "streaming" || overlayState === "copied_notice") {
+          setPhase("listening");
+          setWorkKind("transcribing");
+          setElapsed(0);
+          setLoadNoticeShown(false);
+          setSession((s) => s + 1); // remount the card fresh for this session
+        }
+        setIsVisible(true);
 
         await syncLanguageFromSettings();
         // The Live panel flows downward from a top overlay and upward from a
@@ -127,15 +147,6 @@ const RecordingOverlay: React.FC = () => {
         } catch {
           // Keep the previous/default placement if settings can't be read.
         }
-        setState(overlayState);
-        if (overlayState === "streaming" || overlayState === "copied_notice") {
-          setPhase("listening");
-          setWorkKind("transcribing");
-          setElapsed(0);
-          setLoadNoticeShown(false);
-          setSession((s) => s + 1); // remount the card fresh for this session
-        }
-        setIsVisible(true);
       });
 
       const unlistenHide = await listen("hide-overlay", () => {
@@ -452,8 +463,16 @@ const RecordingOverlay: React.FC = () => {
             commands.dismissOverlayNotice();
           }}
         >
-          <div className="copied-title">Copied to your clipboard</div>
-          <div className="copied-subtitle">Press ⌘V to paste</div>
+          <div className="copied-title">
+            {t("overlay.copiedToClipboard", {
+              defaultValue: "Copied to your clipboard",
+            })}
+          </div>
+          <div className="copied-subtitle">
+            {t("overlay.pressCmdVToPaste", {
+              defaultValue: "Press ⌘V to paste",
+            })}
+          </div>
           <button
             className="copied-close-btn"
             onClick={(e) => {
@@ -500,7 +519,9 @@ const RecordingOverlay: React.FC = () => {
                 <span className={`sdot ${captureReady ? "ready" : "arming"}`} />
               )}
               <span className="notch-label">
-                {working ? "Transcribing" : "Dictating"}
+                {working
+                  ? workLabel
+                  : t("overlay.dictating", { defaultValue: "Dictating" })}
               </span>
             </div>
             <div className="notch-spacer" />

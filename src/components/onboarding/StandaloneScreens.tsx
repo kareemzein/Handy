@@ -14,6 +14,13 @@ export const ReturningPermissions: React.FC<{ onComplete: () => void }> = ({
   onComplete,
 }) => {
   const permissions = usePermissions(false);
+
+  useEffect(() => {
+    if (permissions.allGranted) {
+      onComplete();
+    }
+  }, [permissions.allGranted, onComplete]);
+
   if (!permissions.checked) return null;
   return <Permissions permissions={permissions} onContinue={onComplete} />;
 };

@@ -639,7 +639,6 @@
 /* BOTTOM PLACEMENT (tucks into bottom edge) */
 .ov-stage.bottom .copied-card {
   border-radius: 18px !important;
-  margin-bottom: 20px;
   transform-origin: bottom center;
   animation: copied-pop-bottom 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

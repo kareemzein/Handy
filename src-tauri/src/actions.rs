@@ -886,12 +886,37 @@ impl ShortcutAction for TranscribeAction {
                                         if !has_target {
                                             log::info!("No focused text element detected; copying to clipboard");
                                             use tauri_plugin_clipboard_manager::ClipboardExt;
-                                            let _ = ah_clone.clipboard().write_text(&final_text);
-                                            if owns_ui() {
-                                                crate::overlay::show_copied_to_clipboard_overlay(&ah_clone);
-                                                notices::clear(&ah_clone, NoticeSource::Dictation);
+                                            match ah_clone.clipboard().write_text(&final_text) {
+                                                Ok(()) => {
+                                                    if owns_ui() {
+                                                        crate::overlay::show_copied_to_clipboard_overlay(&ah_clone);
+                                                        notices::clear(&ah_clone, NoticeSource::Dictation);
+                                                        set_tray_state(&ah_clone, TrayIconState::Idle);
+                                                    }
+                                                    emit_transcription_complete(
+                                                        &ah_clone,
+                                                        TranscriptionOutcome::Typed,
+                                                        sample_count,
+                                                        stop_time,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    error!("Failed to copy transcription to clipboard: {}", e);
+                                                    let notice = Notice::new(NoticeCode::PasteFailed, NoticeSource::Dictation);
+                                                    if owns_ui() {
+                                                        notices::raise(&ah_clone, notice);
+                                                        set_tray_state(&ah_clone, TrayIconState::Idle);
+                                                    } else {
+                                                        notices::raise_without_overlay(&ah_clone, notice);
+                                                    }
+                                                    emit_transcription_complete(
+                                                        &ah_clone,
+                                                        TranscriptionOutcome::Failed,
+                                                        sample_count,
+                                                        stop_time,
+                                                    );
+                                                }
                                             }
-                                            set_tray_state(&ah_clone, TrayIconState::Idle);
                                             return;
                                         }
                                         let (outcome, notice) =

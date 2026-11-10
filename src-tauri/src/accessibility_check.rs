@@ -1,6 +1,7 @@
 #[cfg(target_os = "macos")]
 pub mod macos_focus {
     use objc2::msg_send;
+    use objc2::rc::autoreleasepool;
     use objc2::runtime::{AnyClass, AnyObject};
     use objc2_foundation::NSString;
     use std::ffi::c_void;
@@ -22,10 +23,12 @@ pub mod macos_focus {
             value: *mut *const c_void,
         ) -> AXError;
         fn CFRelease(cf: *const c_void);
+        fn CFGetTypeID(cf: *const c_void) -> usize;
+        fn CFStringGetTypeID() -> usize;
     }
 
     pub fn has_focused_text_element() -> bool {
-        unsafe {
+        autoreleasepool(|_| unsafe {
             let ws_class = match AnyClass::get(c"NSWorkspace") {
                 Some(cls) => cls,
                 None => return true,
@@ -106,28 +109,41 @@ pub mod macos_focus {
                     &mut role_val,
                 );
                 if role_err == K_AX_ERROR_SUCCESS && !role_val.is_null() {
-                    let role_str = (&*(role_val as *const NSString)).to_string();
+                    let role_str_opt = if CFGetTypeID(role_val) == CFStringGetTypeID() {
+                        Some((&*(role_val as *const NSString)).to_string())
+                    } else {
+                        None
+                    };
                     CFRelease(role_val);
 
-                    if role_str == "AXTextField"
-                        || role_str == "AXTextArea"
-                        || role_str == "AXComboBox"
-                        || role_str == "AXSearchField"
-                    {
-                        return Some(true);
-                    }
+                    if let Some(role_str) = role_str_opt {
+                        if role_str == "AXTextField"
+                            || role_str == "AXTextArea"
+                            || role_str == "AXComboBox"
+                            || role_str == "AXSearchField"
+                        {
+                            return Some(true);
+                        }
 
-                    // Blank webpage background in browser or non-text UI control
-                    if role_str == "AXWebArea"
-                        || role_str == "AXScrollArea"
-                        || role_str == "AXButton"
-                        || role_str == "AXCheckBox"
-                        || role_str == "AXRadioButton"
-                        || role_str == "AXSlider"
-                        || role_str == "AXScrollBar"
-                        || role_str == "AXTabGroup"
-                    {
-                        return Some(false);
+                        // Explicit non-text UI controls
+                        if role_str == "AXButton"
+                            || role_str == "AXCheckBox"
+                            || role_str == "AXRadioButton"
+                            || role_str == "AXSlider"
+                            || role_str == "AXScrollBar"
+                            || role_str == "AXTabGroup"
+                            || role_str == "AXMenuBar"
+                            || role_str == "AXMenu"
+                            || role_str == "AXMenuItem"
+                            || role_str == "AXToolbar"
+                        {
+                            return Some(false);
+                        }
+
+                        // For system shell (Desktop/Finder), scroll/web areas have no typing target
+                        if is_system_shell && (role_str == "AXScrollArea" || role_str == "AXWebArea") {
+                            return Some(false);
+                        }
                     }
                 }
 
@@ -172,12 +188,22 @@ pub mod macos_focus {
                 }
             }
 
-            if query_success && !focused_val.is_null() {
+            let elem_result = if query_success && !focused_val.is_null() {
                 let result = inspect_element(focused_val as AXUIElementRef);
                 CFRelease(focused_val);
-                if let Some(is_text) = result {
-                    return is_text;
-                }
+                result
+            } else {
+                None
+            };
+
+            if let Some(is_text) = elem_result {
+                return is_text;
+            }
+
+            // If Handy itself is frontmost and no focused text element was found,
+            // do not inject keystrokes into the app UI; copy to clipboard instead.
+            if bundle_id == "com.pais.handy" {
+                return false;
             }
 
             // If we are in the system shell (Desktop, Dock) with no text field -> clipboard
@@ -187,7 +213,7 @@ pub mod macos_focus {
 
             // Fail-open for general apps so typing is never broken
             true
-        }
+        })
     }
 }
 

@@ -448,7 +448,9 @@ jobs:
 
       - name: Build with Tauri (Direct)
         if: ${{ !inputs.sign-binaries }}
-        run: bun run tauri build ${{ inputs.build-args }}
+        env:
+          BUILD_ARGS: ${{ inputs.build-args }}
+        run: bun run tauri build $BUILD_ARGS
 
       - name: Build with Tauri
         if: ${{ inputs.sign-binaries }}
